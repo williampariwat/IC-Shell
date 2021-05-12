@@ -4,6 +4,7 @@
 #include <unistd.h>   // Definition for fork() and execve()
 #include <errno.h>    // Definition for "error handling"
 #include <sys/wait.h> // Definition for wait()
+#define MAXCHAR 1000
 
 	/* Declarations for getline() */
 	char *input = NULL;
@@ -114,30 +115,49 @@
 
 	
 	int main(int argc, char const *argv[]){
-		startDisplay();
-
-
-		while(1){
-			displayPrompt(); // Display a user prompt
-			getline(&input, &capline, stdin); // Read the user input
-			/* Check if input is empty */
-			if(strcmp(input,"\n")==0){
-				continue;
-			}
-		
-			makeTokens(input); // Divide line into tokens 
-
-            /* Check if input is "q", if yes then exit shell */
-			// if (strcmp(array[0], "exit") == 0 && strcmp(array[1], "1") == 0) {
-			// 	printf("bye \n");
-			// 	return 0;
+		if(argv[1] != NULL){
+			
+			char str[MAXCHAR];
+			
+			fp = fopen(argv[1], "r");
+			// if (fp == NULL){
+			//     printf("Could not open file %s",argv[1]);
 			// }
-			// printf("History \n");
-			// printArr(prev);
-			checkBangs(array,prev);
-			// printArr(prev);
+			while (fgets(str, MAXCHAR, fp) != NULL){
+			    printf("Print: %s \n", str);
+				makeTokens(str);
+				checkBangs(array,prev);
+				execute();
+			}
+			fclose(fp);		
+		}
 
-			execute(); // Call execvp()
+		else{
+			startDisplay();
+
+
+			while(1){
+				displayPrompt(); // Display a user prompt
+				getline(&input, &capline, stdin); // Read the user input
+				/* Check if input is empty */
+				if(strcmp(input,"\n")==0){
+					continue;
+				}
+			
+				makeTokens(input); // Divide line into tokens 
+
+	            /* Check if input is "q", if yes then exit shell */
+				if (strcmp(array[0], "exit") == 0 && strcmp(array[1], "1") == 0) {
+					printf("bye \n");
+					return 0;
+				}
+				// printf("History \n");
+				// printArr(prev);
+				checkBangs(array,prev);
+				// printArr(prev);
+
+				execute(); // Call execvp()
+			}
 
 	}
 	
