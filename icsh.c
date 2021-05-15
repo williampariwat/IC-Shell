@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>   // Definition for fork() and execve()
 #include <errno.h>    // Definition for "error handling"
 #include <sys/wait.h> // Definition for wait()
@@ -101,15 +102,6 @@
 	   	for(int j = 0; j < prev_count; j++){
 	   		des[j] =  strdup(src[j]);
 	   	}
-	   // printf("Src: ");
-	   // 	printf("\n");
-
-	   // 	printArr(src);
-	   // 	printf("Des: ");
-	   // 	printf("\n");
-	   // 	printArr(des);
-	   // 	printf("\n");
-
 
    }
 
@@ -142,6 +134,15 @@
    	}
  
    }
+   void sigintHandler(int sig_num)
+   {
+        write(1, "\n", 1);
+   }
+
+   void sigstopHandler(int sig_num){
+   		printf("\n");
+   }
+
 
 
 
@@ -169,7 +170,10 @@
 		}
 
 		else{
+			sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigintHandler }, NULL);
+			sigaction(SIGTSTP, &(struct sigaction){.sa_handler = sigstopHandler}, NULL);
 			startDisplay();
+
 			while(1){
 				displayPrompt(); // Display a user prompt
 				getline(&input, &capline, stdin); // Read the user input
