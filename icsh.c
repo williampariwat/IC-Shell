@@ -254,17 +254,10 @@
         // printf("Array\n");
         // printArr(array);
 
+   }
 
-
-        // printf("ofile : %s \n", ofile);
-        // we got something like "cat <"
-        // if (err)
-        //     continue;
-
-        // // no child arguments
-        // if (j == 0)
-        //     continue;
-
+   void checkAmpersand(char** args){
+   	
    }
 
 
@@ -323,6 +316,8 @@
                 // printf("After\n");
                 // printArr(array);
                 checkBangs(array,prev);
+
+                checkAmpersand(array);
 
                 // printf("Prev\n");
                 // printArr(prev);
