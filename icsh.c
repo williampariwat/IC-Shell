@@ -186,6 +186,14 @@
         printf("\n");
    }
 
+   void sigChildHandler(int sig_num)
+   {
+   	int status;
+   	int result = wait(&status);
+
+   	printf("Wait returned %d\n", result);
+   }
+
    void checkRedirect(char** args, char** args2){
       
         // printf("Args\n");
@@ -257,7 +265,7 @@
    }
 
    void checkAmpersand(char** args){
-   	
+
    }
 
 
