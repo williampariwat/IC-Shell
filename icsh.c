@@ -4,6 +4,8 @@
 //          https://stackoverflow.com/questions/58361506/save-history-command-on-simple-shell-by-c-code
 //          https://stackoverflow.com/questions/52939356/redirecting-i-o-in-a-custom-shell-program-written-in-c
 //          http://people.cs.pitt.edu/~khalifa/cs449/spr07/Assigns/Assign4/myshell.c
+// 			https://github.com/hungys/mysh/blob/master/mysh.c
+// 			https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -17,6 +19,31 @@
 
 
 #define MAXCHAR 1000
+#define NR_JOBS 20
+#define BACKGROUND_EXECUTION 0
+#define FOREGROUND_EXECUTION 1
+
+struct process {
+    char *command;
+    int argc;
+    char **argv;
+    char *input_path;
+    char *output_path;
+    pid_t pid;
+    int type;
+    int status;
+    struct process *next;
+};
+
+struct job {
+    int id;
+    struct process *root;
+    char *command;
+    pid_t pgid;
+    int mode;
+};
+
+
     /* Declarations for getline() */
     char *input = NULL;
     size_t capline = 0; // Capacity
@@ -28,6 +55,9 @@
 
     // For condition in checkRedirect
     int cond;
+
+    //For Ampersand Condition
+    int block;
     
     //Declaration for file
     FILE *fp;
@@ -96,7 +126,7 @@
 
     /* Execute a command */
    void execute(){
-
+   		int status;
         int pid = fork(); // Create a new process
         if (pid != 0) { // If not successfully completed
                 int s;
@@ -134,6 +164,11 @@
                 exit(errno);
             }               
         }
+        // Wait for the child process to complete, if necessary
+          if(block) {
+            printf("Waiting for child, pid = %d\n", pid);
+            waitpid(pid, &status, 0);
+          }
 
    }
 
@@ -264,8 +299,17 @@
 
    }
 
-   void checkAmpersand(char** args){
-
+   int checkAmpersand(char** args){
+   	for( i = 0; args[i] != NULL; i++){
+   		if(args[i][0] == '&'){
+   			free(args[i]);
+   			args[i] = NULL;
+   			return 1;
+   		}else{
+   			return 0;
+   		}
+   	}
+   	return 0;
    }
 
 
@@ -298,6 +342,7 @@
         else{
             sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigintHandler }, NULL);
             sigaction(SIGTSTP, &(struct sigaction){.sa_handler = sigstopHandler}, NULL);
+            sigaction(SIGCHLD,  &(struct sigaction){.sa_handler = sigChildHandler}, NULL);
             startDisplay();
 
             while(1){
@@ -315,6 +360,7 @@
                     return atoi(array[1]);
                 }
 
+                block = (checkAmpersand(array) == 0);
                 //Checking for redirection
                 ofile = NULL;
                 ifile = NULL;
@@ -325,7 +371,6 @@
                 // printArr(array);
                 checkBangs(array,prev);
 
-                checkAmpersand(array);
 
                 // printf("Prev\n");
                 // printArr(prev);
