@@ -4,8 +4,8 @@
 //          https://stackoverflow.com/questions/58361506/save-history-command-on-simple-shell-by-c-code
 //          https://stackoverflow.com/questions/52939356/redirecting-i-o-in-a-custom-shell-program-written-in-c
 //          http://people.cs.pitt.edu/~khalifa/cs449/spr07/Assigns/Assign4/myshell.c
-// 			https://github.com/hungys/mysh/blob/master/mysh.c
-// 			https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
+//          https://github.com/hungys/mysh/blob/master/mysh.c
+//          https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,35 +20,31 @@
 
 #define MAXCHAR 1000
 #define NR_JOBS 20
-#define BACKGROUND_EXECUTION 0
-#define FOREGROUND_EXECUTION 1
 
-struct process {
-    char *command;
-    int argc;
-    char **argv;
-    char *input_path;
-    char *output_path;
-    pid_t pid;
-    int type;
-    int status;
-    struct process *next;
+struct job
+{
+    char name[100];
+    int pid;
+    //int state;
+    int is_back;
 };
-
-struct job {
-    int id;
-    struct process *root;
-    char *command;
-    pid_t pgid;
+    
+    
+    //Setting up Job
+    struct job back[100];
+    struct job fore;
+    int back_count = 0, shellid = 0;
     int mode;
-};
+
+     // Setting up Childpid
+    int childpid = -1;
 
 
-    /* Declarations for getline() */
+     // Declarations for getline() 
     char *input = NULL;
     size_t capline = 0; // Capacity
 
-    /* Declaration for strtok() */
+     // Declaration for strtok() 
     int i;
     int j;
     int err;
@@ -67,8 +63,8 @@ struct job {
     char *args2[512];
 
     // count numbers of indices in prev array
-    int count;
-    int prev_count;
+    // int count;
+    // int prev_count;
     char *token;
     char *array[512]; 
     // For previous command
@@ -95,43 +91,45 @@ struct job {
         }
    }
 
-    /* Display some info to the user at the start */
+     // Display some info to the user at the start 
     void startDisplay(){
     printf("\n");
     printf("Starting IC Shell                                            \n");
     printf("\n");
     }
 
-    /* Print out "MY_SHELL" */
+     // Print out "MY_SHELL" 
     void displayPrompt(){
         printf("icsh $ ");
     }
 
-    /* Divide input line into tokens */
+     // Divide input line into tokens 
     void makeTokens(char *input){
         i = 0;
         // idx = 0
         token = strtok(input, "\n ");
             while (token != NULL) { 
-            if(strcmp(token,"!!") == 0) {
+            // if(strcmp(token,"!!") == 0) {
 
-            }else{
-                count++;
-            }               
+            // }else{
+            //     count++;
+            // }               
             array[i++] = token; // Add tokens into the array
             token = strtok(NULL, "\n ");
             }
         array[i] = NULL;
     }
 
-    /* Execute a command */
-   void execute(){
-   		int status;
+     // Execute a command 
+   void execute(int k){
+        int status;
         int pid = fork(); // Create a new process
-        if (pid != 0) { // If not successfully completed
-                int s;
-                waitpid(-1, &s, 0); // Wait for process termination
-        } else {
+        if (pid < 0) { // If not successfully completed
+            printf("Error: Fork Failed\n");
+            exit(0);
+        } else if(pid == 0) {
+            setpgid(0, 0);
+
             if (ifile != NULL) {
                 int fd = open(ifile, O_RDONLY);
 
@@ -159,16 +157,32 @@ struct job {
             }
 
 
-            if(execvp(array[0], array) == -1){ // If returned -1 => something went wrong! If not then command successfully completed */
+            if(execvp(array[0], array) == -1){ // If returned -1 => something went wrong! If not then command successfully completed 
                 perror("Wrong command"); // Display error message
                 exit(errno);
             }               
         }
+        else{
+            int x;
+            childpid = pid;
+            char name[100];
+            strcpy(name, array[0]);
+            for (i = 1; i < (k - 1); i++)
+            {
+                strcat(name, " ");
+                strcat(name, array[i]);
+            }
+
+            fore.pid = pid;
+            strcpy(fore.name, name);
+            fore.is_back = 0;
+            waitpid(-1, NULL, WUNTRACED);
+        }
         // Wait for the child process to complete, if necessary
-          if(block) {
-            printf("Waiting for child, pid = %d\n", pid);
-            waitpid(pid, &status, 0);
-          }
+          // if(block) {
+          //   printf("Waiting for child, pid = %d\n", pid);
+          //   waitpid(pid, &status, 0);
+          // }
 
    }
 
@@ -205,10 +219,10 @@ struct job {
         }
     }
     else{
-        prev_count = count;
+        // prev_count = count;
         // If the length is one then do something else 
         copyArr(history,argv);
-        count = 0;
+        // count = 0;
     }
  
    }
@@ -221,13 +235,27 @@ struct job {
         printf("\n");
    }
 
-   void sigChildHandler(int sig_num)
-   {
-   	int status;
-   	int result = wait(&status);
-
-   	printf("Wait returned %d\n", result);
-   }
+   void child_sig(int signo)
+{
+    pid_t pid;
+    int x;
+    pid = waitpid(WAIT_ANY, &x, WNOHANG);
+    int i;
+    for (i = 1; i <= back_count; i++)
+    {
+        if (back[i].pid == pid)
+        {
+            int exit_status = WEXITSTATUS(x);
+            if (exit_status == 0)
+                printf("\n%s with pid %d exited normally\n", back[i].name, back[i].pid);
+            else
+                printf("\n%s with pid %d exited with exit status %d\n", back[i].name, back[i].pid, exit_status);
+            fflush(stdout);
+            break;
+        }
+    }
+    signal(SIGCHLD, child_sig);
+}
 
    void checkRedirect(char** args, char** args2){
       
@@ -300,17 +328,72 @@ struct job {
    }
 
    int checkAmpersand(char** args){
-   	for( i = 0; args[i] != NULL; i++){
-   		if(args[i][0] == '&'){
-   			free(args[i]);
-   			args[i] = NULL;
-   			return 1;
-   		}else{
-   			return 0;
-   		}
-   	}
-   	return 0;
-   }
+    for( i = 0; args[i] != NULL; i++){
+        if(args[i][0] == '&'){
+            // free(args[i]);
+            args[i] = NULL;
+            // printArr(array);
+            return 1;
+        }
+    }
+    // printArr(array);
+
+    return 0;
+    }
+
+    void background_execute(int count){
+        int pid = fork();
+        childpid = pid;
+
+        if (pid < 0)
+        {
+            printf("Error: Fork Failed\n");
+            return;
+        }
+        else if (pid == 0)
+        {
+            setpgid(0, 0);
+            execvp(array[0], array);
+        }
+        else
+        {
+            back_count++;
+            printf("[%d] %d\n", back_count, pid);
+        }
+
+        char name[100];
+        strcpy(name, array[0]);
+        for (i = 1; i < (count - 1); i++)
+        {
+            strcat(name, " ");
+            strcat(name, array[i]);
+        }
+
+        // print_processes_of_job()
+
+        back[back_count].pid = pid;
+        back[back_count].is_back = 1;
+        strcpy(back[back_count].name, name);
+    }
+
+    void ctrl_z(int signo)
+    {
+        pid_t p = getpid();
+        if (p != shellid)
+            return;
+        //print();
+        if (childpid != -1)
+        {
+            kill(childpid, SIGTTIN);
+            kill(childpid, SIGTSTP);
+            back_count++;
+            back[back_count].pid = childpid;
+            back[back_count].is_back = 1;
+            strcpy(back[back_count].name, fore.name);
+        }
+        signal(SIGTSTP, ctrl_z);
+    }
+
 
 
 
@@ -329,11 +412,15 @@ struct job {
                 // printf("Print: %s \n", str);
                 makeTokens(str);
                 if (strcmp(array[0], "exit") == 0) {
+                    printf("Bye\n");
                     return atoi(array[1]);
                 }
                 checkBangs(array,prev);
-
-                execute();
+                int count = 0;
+                for(i = 0; array[i] != NULL; i++){
+                    count++;
+                }
+                execute(count);
                 
             }
             fclose(fp);     
@@ -341,8 +428,11 @@ struct job {
 
         else{
             sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigintHandler }, NULL);
-            sigaction(SIGTSTP, &(struct sigaction){.sa_handler = sigstopHandler}, NULL);
-            sigaction(SIGCHLD,  &(struct sigaction){.sa_handler = sigChildHandler}, NULL);
+            signal(SIGTSTP, ctrl_z);
+            signal(SIGCHLD, SIG_IGN);
+            signal(SIGCHLD, child_sig);
+
+
             startDisplay();
 
             while(1){
@@ -357,10 +447,11 @@ struct job {
 
                 /* Check if input is "q", if yes then exit shell */
                 if (strcmp(array[0], "exit") == 0) {
+                    printf("Bye\n");
                     return atoi(array[1]);
                 }
 
-                block = (checkAmpersand(array) == 0);
+                block = checkAmpersand(array);
                 //Checking for redirection
                 ofile = NULL;
                 ifile = NULL;
@@ -374,8 +465,16 @@ struct job {
 
                 // printf("Prev\n");
                 // printArr(prev);
-
-                execute(); // Call execvp()
+                int count = 0;
+                for(i = 0; array[i] != NULL; i++){
+                    count++;
+                }
+                if(block == 1){
+                    background_execute(count);
+                    block = 0;
+                }else{
+                    execute(count); // Call execvp()
+                }
 
             }
         // }
