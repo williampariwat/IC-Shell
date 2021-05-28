@@ -167,6 +167,7 @@ struct job
             childpid = pid;
             char name[100];
             strcpy(name, array[0]);
+
             for (i = 1; i < (k - 1); i++)
             {
                 strcat(name, " ");
@@ -247,9 +248,10 @@ struct job
         {
             int exit_status = WEXITSTATUS(x);
             if (exit_status == 0)
-                printf("\n%s with pid %d exited normally\n", back[i].name, back[i].pid);
+                printf("\n%s with pid %d is done\n", back[i].name, back[i].pid);
             else
                 printf("\n%s with pid %d exited with exit status %d\n", back[i].name, back[i].pid, exit_status);
+            printf("\n");
             fflush(stdout);
             break;
         }
@@ -363,7 +365,8 @@ struct job
 
         char name[100];
         strcpy(name, array[0]);
-        for (i = 1; i < (count - 1); i++)
+
+        for (i = 1; array[i] != NULL; i++)
         {
             strcat(name, " ");
             strcat(name, array[i]);
@@ -377,7 +380,8 @@ struct job
     }
 
     void ctrl_z(int signo)
-    {
+    {   
+        printf("\n");
         pid_t p = getpid();
         if (p != shellid)
             return;
@@ -390,12 +394,119 @@ struct job
             back[back_count].pid = childpid;
             back[back_count].is_back = 1;
             strcpy(back[back_count].name, fore.name);
+            printf("[1]+ Stopped %s \n", back[back_count].name );
         }
         signal(SIGTSTP, ctrl_z);
     }
 
+void print_jobs()
+{
+    int i;
+    int j = 1;
+    for (i = 1; i <= back_count; i++)
+    {
+        if (back[i].is_back == 1)
+        {
+            char stat[1000];
+            char status;
+            int p;
+            long unsigned mem;
+            char str[10];
+            sprintf(str, "%d", back[i].pid);
 
+            strcpy(stat, "/proc/");
+            strcat(stat, str);
+            strcat(stat, "/stat");
+            FILE *fd;
+            if ((fd = fopen(stat, "r")) == NULL)
+            {
+                printf("[%d] %s %s [%d]\n", j, "Done", back[i].name, back[i].pid);
+            }
+            else
+            {
+                // fscanf(fd, "%d %*s %c %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %lu %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d", &p, &status, &mem);
+                // fclose(fd);
+                printf("[%d] ", j);
+                if (status == 'T')
+                    printf("%s ", "Stopped");
+                else 
+                    printf("%s ", "Running");
+                printf("%s [%d]\n", back[i].name, back[i].pid);
+            }
+            j++;
+        }
+    }
+}
 
+void fg(int k)
+{
+    int proc = atoi(&array[1][1]);
+    // if (k >= 3)
+    //     printf("Too many arguments\n");
+    // else if (k <= 1)
+    //     printf("Too few arguments\n");
+    // else
+    // {
+    if (proc > back_count)
+        printf("No such job\n");
+    else
+    {
+        pid_t pid = back[proc].pid;
+        char stat[1000];
+        char status;
+        int p;
+        long unsigned mem;
+        char str[10];
+        sprintf(str, "%d", back[proc].pid);
+
+        strcpy(stat, "/proc/");
+        strcat(stat, str);
+        strcat(stat, "/stat");
+        FILE *fd;
+        if (pid < 0)
+        {
+            printf("Process has been terminated. Cannot bring to foreground.\n");
+        }
+        else
+        {
+            printf("%s", back[proc].name);
+
+            kill(pid, SIGCONT);
+            childpid = pid;
+            strcpy(fore.name, back[proc].name);
+            fore.pid = back[proc].pid;
+            fore.is_back = 0;
+            int j = proc;
+            for (j = proc; j < back_count; j++)
+            {
+                back[j] = back[j + 1];
+            }
+            back_count--;
+            waitpid(-1, NULL, WUNTRACED);
+        }
+    }
+}
+
+void bg(int k)
+{
+
+    int proc = atoi(&array[1][1]);
+    if (proc > back_count)
+        printf("No such job\n");
+    else 
+    {
+        printf("Process continue to %s\n",back[proc].name);
+
+        pid_t pid = back[proc].pid;
+        kill(pid, SIGTTIN);
+        kill(pid, SIGCONT);
+    }
+
+}
+// }
+// }
+
+//Check foreground parser "%"
 
 
 
@@ -427,6 +538,8 @@ struct job
         }
 
         else{
+            shellid = getpid();
+
             sigaction(SIGINT, &(struct sigaction){ .sa_handler = sigintHandler }, NULL);
             signal(SIGTSTP, ctrl_z);
             signal(SIGCHLD, SIG_IGN);
@@ -450,7 +563,10 @@ struct job
                     printf("Bye\n");
                     return atoi(array[1]);
                 }
-
+                int count = 0;
+                for(i = 0; array[i] != NULL; i++){
+                    count++;
+                }
                 block = checkAmpersand(array);
                 //Checking for redirection
                 ofile = NULL;
@@ -461,20 +577,33 @@ struct job
                 // printf("After\n");
                 // printArr(array);
                 checkBangs(array,prev);
+                if(count == 1 && (strcmp(array[0], "jobs") == 0)){
+                    print_jobs();
+                }
 
 
                 // printf("Prev\n");
                 // printArr(prev);
-                int count = 0;
-                for(i = 0; array[i] != NULL; i++){
-                    count++;
+                // fg_parser(array);
+
+
+                if(count == 2 && strcmp(array[0],"fg") == 0 && array[1][0] == '%'){
+                  fg(count);
+                }else if (count == 2 && strcmp(array[0],"bg") == 0 && array[1][0] == '%'){
+                  bg(count);
                 }
-                if(block == 1){
-                    background_execute(count);
-                    block = 0;
-                }else{
-                    execute(count); // Call execvp()
+                else{
+                    if(block == 1){
+                        background_execute(count);
+                        block = 0;
+                    }else{
+                        execute(count); // Call execvp()
+                    }
                 }
+
+                
+                //If it's not a background process/ else
+                
 
             }
         // }
