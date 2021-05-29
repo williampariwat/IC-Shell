@@ -1,0 +1,8 @@
+.
+..
+.DS_Store
+.git
+code.c
+icsh
+icsh.c
+test.txt
