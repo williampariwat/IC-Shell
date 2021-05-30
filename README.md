@@ -57,6 +57,57 @@ world
 Bye
 ```
 
+External Program:
+``` icsh $ ls
+file_a file_b file_c
+icsh $
+```
+
+I/O Redirection:
+```
+icsh $ la -l > some_file
+```
+
+Background jobs and jobs control:
+```
+1: icsh $ sleep 5 &
+2: [1] 843
+3: icsh $
+```
+
+Jobs:
+```
+icsh $ sleep 100 &
+[1] 855
+icsh $ sleep 200 &
+[2] 856
+icsh $ jobs
+[1]-  Running                 sleep 100 &
+[2]+  Running                 sleep 200 &
+icsh $ 
+```
+
+Foreground fg %<job_id>:
+```
+
+icsh $ sleep 100 &
+[1] 862
+icsh $ fg %1
+sleep 100
+```
+
+Background bg %<job_id>:
+```
+
+icsh $ sleep 100
+^Z
+[1]+  Stopped                 sleep 100
+icsh $ bg %1
+[1]+ sleep 100 &
+icsh $ 
+```
+
+ 
 ##Additional Feature:
 
 #### reminder
