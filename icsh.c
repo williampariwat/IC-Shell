@@ -22,6 +22,8 @@
 #define STATUS_RUNNING 0
 #define STATUS_DONE 1
 #define STATUS_SUSPENDED 2
+#define STATUS_CONTINUED 3
+
 
 
 #define MAXCHAR 1000
@@ -41,6 +43,8 @@ struct job
 struct job back[100];
 struct job fore;
 int back_count = 0;
+int child_count = 0;
+
 int shellid = 0;
 int mode;
 
@@ -177,7 +181,7 @@ void execute(int k){
             setpgid(0, 0);
 
             if (ifile != NULL) {
-                
+
                 array[0] = args2[0];
                 for(i = 1; array[i] != NULL; i++){
                     array[i] = NULL;
@@ -228,7 +232,7 @@ void execute(int k){
             char name[100];
             strcpy(name, array[0]);
 
-            for (i = 1; i < (k - 1); i++)
+            for (i = 1; i < k; i++)
             {
                 strcat(name, " ");
                 strcat(name, array[i]);
@@ -283,8 +287,9 @@ void ctrl_z(int signo)
             back[back_count].is_back = 1;
             strcpy(back[back_count].name, fore.name);
             back[back_count].status = STATUS_SUSPENDED;
-            printf("[1]+ Stopped %s \n", back[back_count].name );
+            printf("[%d]+ Stopped                 %s \n",back_count, back[back_count].name );
         }
+
         signal(SIGTSTP, ctrl_z);
 }
 
@@ -294,10 +299,6 @@ void sigintHandler(int sig_num)
    }
 
 
-void sigstopHandler(int sig_num)
-    {
-        printf("\n");
-    }
 
 
 void child_sig(int signo)
@@ -312,16 +313,18 @@ void child_sig(int signo)
         {
             int exit_status = WEXITSTATUS(x);
             if (exit_status == 0){
+                child_count++;
                 back[i].status = STATUS_DONE;
-                printf("\n%s with pid %d is done\n", back[i].name, back[i].pid);
+                printf("\n[%d] Done                    %s \n", child_count,back[i].name);
+                printf("icsh $ "); 
             }
             else{
-                printf("\n%s with pid %d exited with exit status %d\n", back[i].name, back[i].pid, exit_status);
+                printf("%s with pid %d exited with exit status %d\n", back[i].name, back[i].pid, exit_status);
             }
-            printf("\n");
             fflush(stdout);
             break;
         }
+
     }
     signal(SIGCHLD, child_sig);
 }
@@ -332,14 +335,6 @@ void child_sig(int signo)
 Redirection
 -------------------*/
 
-// int checkRedirect(char** args){
-//     for(i = 0; args[i] != NULL ; i++){
-//         if(*args[i] == '<' || *args[i] == '>'){
-//             return 1;
-//         }
-//     }
-//     return 0;
-// }
 void checkRedirect(char** args, char** args2){
       
         // printf("Args\n");
@@ -390,28 +385,13 @@ void checkRedirect(char** args, char** args2){
                         err = 1;
                 break;
 
-            default:
-                // printf(" Args2[j++] :  %s \n",cp );
-  
+            default:  
                 args2[j++] = cp;
                 break;
             }
         }
 
         args2[j] = NULL;
-
-        // printf("Args2\n");
-        // printArr(args2);
-        // printf("Condition : %d \n",cond );
-        // if(cond == 1){
-        //     // copyArr(array,args2);
-        //     array[0] = args2[0];
-        //     for(i = 1; array[i] != NULL; i++){
-        //         array[i] = NULL;
-        //     }
-        // }
-        // printf("Array\n");
-        // printArr(array);
 
 }
 
@@ -463,7 +443,6 @@ void background_execute(int count){
             strcat(name, array[i]);
         }
 
-        // print_processes_of_job()
         back[back_count].status = STATUS_RUNNING;
         back[back_count].pid = pid;
         back[back_count].is_back = 1;
@@ -484,16 +463,19 @@ void print_jobs()
         {
             if (back[i].status == STATUS_DONE)
             {
-                printf("[%d] %s %s [%d]\n", j, "Done", back[i].name, back[i].pid);
+                printf("[%d] %s                    %s\n", j, "Done", back[i].name);
             }
             else
             {
                 printf("[%d] ", j);
-                if (back[i].status == STATUS_SUSPENDED)
-                    printf("%s ", "Stopped");
-                else 
-                    printf("%s ", "Running");
-                printf("%s [%d]\n", back[i].name, back[i].pid);
+                if (back[i].status == STATUS_SUSPENDED){
+                    printf("%s ", "Stopped                 ");
+                    printf("%s \n", back[i].name);
+                }
+                else{
+                    printf("%s ", "Running                ");
+                    printf("%s &\n", back[i].name);
+                }
             }
             j++;
         }
@@ -512,24 +494,13 @@ void fg(int k)
     else
     {
         pid_t pid = back[proc].pid;
-        char stat[1000];
-        char status;
-        int p;
-        long unsigned mem;
-        char str[10];
-        sprintf(str, "%d", back[proc].pid);
-
-        strcpy(stat, "/proc/");
-        strcat(stat, str);
-        strcat(stat, "/stat");
-        FILE *fd;
         if (pid < 0)
         {
             printf("Process has been terminated. Cannot bring to foreground.\n");
         }
         else
         {
-            printf("%s", back[proc].name);
+            printf("%s \n", back[proc].name);
 
             kill(pid, SIGCONT);
             childpid = pid;
@@ -550,15 +521,17 @@ void fg(int k)
 Background Feature
 -------------------*/
 void bg(int k)
-{
+{ 
+    int j = 1;
 
     int proc = atoi(&array[1][1]);
     if (proc > back_count)
         printf("No such job\n");
     else 
     {
-        printf("Process continue to %s\n",back[proc].name);
-
+        back[proc].status = STATUS_CONTINUED;
+        printf("[%d]+ %s &\n",j,back[proc].name);
+        j++;
         pid_t pid = back[proc].pid;
         kill(pid, SIGTTIN);
         kill(pid, SIGCONT);
@@ -592,7 +565,7 @@ Additional Feature
 void remindmeto(int count)
 {
 
-    int rem = atoi(array[1]);
+    int rem = atoi(array[2]);
     int pid = fork();
     if (pid < 0)
         printf("Sorry reminder could not be added\n");
@@ -614,41 +587,6 @@ void remindmeto(int count)
     }
 
 }
-void clock_display(char *token)
-{
-    char st[100][100];
-    int k = 0;
-    while (token != NULL)
-    {
-        strcpy(st[k++], token);
-        token = strtok(NULL, " \n\t\r");
-    }
-    int rem = atoi(st[2]);
-    int n = (atoi(st[4]) / rem) + 1;
-
-    char d[40], t[40];
-    strcpy(d, "/sys/class/rtc/rtc0/date");
-    strcpy(t, "/sys/class/rtc/rtc0/time");
-    while (n--)
-    {
-        FILE *fp = fopen(d, "r");
-        char dinfo[100], tinfo[100];
-        fgets(dinfo, sizeof d, fp);
-        int l = strlen(dinfo);
-        dinfo[l - 1] = '\0';
-        printf("%s, ", dinfo);
-        fclose(fp);
-
-        fp = fopen(t, "r");
-        fgets(tinfo, sizeof t, fp);
-        l = strlen(tinfo);
-        tinfo[l - 1] = '\0';
-        printf(" %s\n", tinfo);
-        fclose(fp);
-
-        sleep(rem);
-    }
-}
 
 
 void resetArray(char** args){
@@ -667,9 +605,7 @@ int main(int argc, char const *argv[]){
         char str[MAXCHAR];
 
         fp = fopen(argv[1], "r");
-        // if (fp == NULL){
-        //     printf("Could not open file %s",argv[1]);
-        // }
+
         while (fgets(str, MAXCHAR, fp) != NULL){
             // printf("Print: %s \n", str);
             makeTokens(str);
@@ -727,17 +663,10 @@ int main(int argc, char const *argv[]){
             block = checkAmpersand(array);
 
             checkRedirect(array,args2);
-            // printf("Before\n");
-            // printArr(array);
-            // printf("After\n");
+
             checkBangs(array,prev);
 
-            // printArr(array);
-
-            // if( count >= 3 && (strcmp(array[0], "remindmeto") == 0)) {
-            //     remindmeto(count);
-            // }
-
+ 
             if(count == 1 && (strcmp(array[0], "jobs") == 0)){
                 print_jobs();
             }
@@ -755,10 +684,7 @@ int main(int argc, char const *argv[]){
                 execute(count); // Call execvp()
 
             }
-        }
-            
-            //If it's not a background process/ else
-            
+        }            
 
         }
     }
