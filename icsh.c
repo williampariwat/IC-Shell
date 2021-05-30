@@ -1,11 +1,11 @@
 // #Pariwat Huang 6180067
 // Reference : 
-//          https://github.com/szholdiyarov/command-line-interpreter/blob/master/myshell.c
-//          https://stackoverflow.com/questions/58361506/save-history-command-on-simple-shell-by-c-code
-//          https://stackoverflow.com/questions/52939356/redirecting-i-o-in-a-custom-shell-program-written-in-c
-//          http://people.cs.pitt.edu/~khalifa/cs449/spr07/Assigns/Assign4/myshell.c
-//          https://github.com/hungys/mysh/blob/master/mysh.c
-//          https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
+         // https://github.com/szholdiyarov/command-line-interpreter/blob/master/myshell.c
+         // https://stackoverflow.com/questions/58361506/save-history-command-on-simple-shell-by-c-code
+         // https://stackoverflow.com/questions/52939356/redirecting-i-o-in-a-custom-shell-program-written-in-c
+         // http://people.cs.pitt.edu/~khalifa/cs449/spr07/Assigns/Assign4/myshell.c
+         // https://github.com/hungys/mysh/blob/master/mysh.c
+         // https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
 
 #include <stdio.h>
 #include <string.h>
@@ -36,7 +36,8 @@ struct job
     int status;
     int is_back;
 };
-    
+
+
 /*---------------
   Setting up job
 -----------------*/
@@ -47,7 +48,7 @@ int child_count = 0;
 
 int shellid = 0;
 int mode;
-
+int switcher = 0;
 /*--------------------
    Setting up childpid
 ---------------------*/
@@ -69,7 +70,7 @@ int err;
   For Checkredirect
 -----------------*/
 int cond;
-
+int set_count;
 /*------------------------
    For ampersand condition
 ---------------------------*/
@@ -183,8 +184,14 @@ void execute(int k){
             if (ifile != NULL) {
 
                 array[0] = args2[0];
-                for(i = 1; array[i] != NULL; i++){
-                    array[i] = NULL;
+                if(set_count < 4){
+                    for(i = 1; array[i] != NULL; i++){
+                        array[i] = NULL;
+                    }
+                }else{
+                    for(i = 2; array[i] != NULL; i++){
+                        array[i] = NULL;
+                    }
                 }
 
                 int fd = open(ifile, O_RDONLY);
@@ -196,19 +203,21 @@ void execute(int k){
                 close(fd);
             }
 
-            // trying to get this to work
-            // NOTE: now it works :-)
-            // open stdout
             if (ofile != NULL) {
 
                 array[0] = args2[0];
-                for(i = 1; array[i] != NULL; i++){
-                    array[i] = NULL;
+                if(set_count < 4){
+                    for(i = 1; array[i] != NULL; i++){
+                        array[i] = NULL;
+                    }
+                }else{
+                    for(i = 2; array[i] != NULL; i++){
+                        array[i] = NULL;
+                    }
                 }
 
                 int fd2;
 
-                //printf("PLEASE WORK");
                 if ((fd2 = open(ofile, O_WRONLY | O_CREAT, 0644)) < 0) {
                     perror("couldn't open output file.");
                     exit(0);
@@ -315,7 +324,7 @@ void child_sig(int signo)
             if (exit_status == 0){
                 child_count++;
                 back[i].status = STATUS_DONE;
-                printf("\n[%d] Done                    %s \n", child_count,back[i].name);
+                printf("\n[%d]+ Done                    %s \n", child_count,back[i].name);
                 printf("icsh $ "); 
             }
             else{
@@ -415,38 +424,39 @@ int checkAmpersand(char** args){
 Background Execution
 -------------------*/
 void background_execute(int count){
-        int pid = fork();
-        childpid = pid;
 
-        if (pid < 0)
-        {
-            printf("Error: Fork Failed\n");
-            return;
-        }
-        else if (pid == 0)
-        {
-            setpgid(0, 0);
-            execvp(array[0], array);
-        }
-        else
-        {
-            back_count++;
-            printf("[%d] %d\n", back_count, pid);
-        }
+    int pid = fork();
+    childpid = pid;
 
-        char name[100];
-        strcpy(name, array[0]);
+    if (pid < 0)
+    {
+        printf("Error: Fork Failed\n");
+        return;
+    }
+    else if (pid == 0)
+    {
+        setpgid(0, 0);
+        execvp(array[0], array);
+    }
+    else
+    {
+        back_count++;
+        printf("[%d] %d\n", back_count, pid);
+    }
 
-        for (i = 1; array[i] != NULL; i++)
-        {
-            strcat(name, " ");
-            strcat(name, array[i]);
-        }
+    char name[100];
+    strcpy(name, array[0]);
 
-        back[back_count].status = STATUS_RUNNING;
-        back[back_count].pid = pid;
-        back[back_count].is_back = 1;
-        strcpy(back[back_count].name, name);
+    for (i = 1; array[i] != NULL; i++)
+    {
+        strcat(name, " ");
+        strcat(name, array[i]);
+    }
+
+    back[back_count].status = STATUS_RUNNING;
+    back[back_count].pid = pid;
+    back[back_count].is_back = 1;
+    strcpy(back[back_count].name, name);
 }
 
 
@@ -467,12 +477,19 @@ void print_jobs()
             }
             else
             {
-                printf("[%d] ", j);
                 if (back[i].status == STATUS_SUSPENDED){
+                    printf("[%d] ", j);
                     printf("%s ", "Stopped                 ");
                     printf("%s \n", back[i].name);
                 }
                 else{
+                    if(switcher == 0){
+                        printf("[%d]- ", j);
+                        switcher = 1;
+                    }else{
+                        printf("[%d]+ ", j);
+                        switcher = 0;
+                    }
                     printf("%s ", "Running                ");
                     printf("%s &\n", back[i].name);
                 }
@@ -513,7 +530,9 @@ void fg(int k)
                 back[j] = back[j + 1];
             }
             back_count--;
+
             waitpid(-1, NULL, WUNTRACED);
+
         }
     }
 }
@@ -559,13 +578,16 @@ void yellow() {
 void resetcolor () {
   printf("\033[0m");
 }
+
+
+
 /*------------------
 Additional Feature
 -------------------*/
 void remindmeto(int count)
 {
 
-    int rem = atoi(array[2]);
+    int rem = atoi(array[1]);
     int pid = fork();
     if (pid < 0)
         printf("Sorry reminder could not be added\n");
@@ -587,6 +609,7 @@ void remindmeto(int count)
     }
 
 }
+
 
 
 void resetArray(char** args){
@@ -650,16 +673,17 @@ int main(int argc, char const *argv[]){
 
             makeTokens(input); // Divide line into tokens
 
+            int count = 0;
 
             /* Check if input is "q", if yes then exit shell */
             if (strcmp(array[0], "exit") == 0) {
                 printf("Bye\n");
                 return atoi(array[1]);
             }
-            int count = 0;
             for(i = 0; array[i] != NULL; i++){
                 count++;
             }
+            set_count = count;
             block = checkAmpersand(array);
 
             checkRedirect(array,args2);
@@ -676,7 +700,6 @@ int main(int argc, char const *argv[]){
               bg(count);
             }else if( count >= 3 && (strcmp(array[0], "remindmeto") == 0)) {
                 remindmeto(count);
-                resetArray(array);
             }else if(block == 1){
                     background_execute(count);
                     block = 0;
@@ -686,5 +709,5 @@ int main(int argc, char const *argv[]){
             }
         }            
 
-        }
     }
+}
