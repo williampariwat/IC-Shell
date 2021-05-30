@@ -1,6 +1,6 @@
-#Pariwat Huang 6180067 IC-SHELL
+Pariwat Huang 6180067 IC-SHELL
 
-##References:
+References:
 https://github.com/szholdiyarov/command-line-interpreter/blob/master/myshell.c
 https://stackoverflow.com/questions/58361506/save-history-command-on-simple-shell-by-c-code
 https://stackoverflow.com/questions/52939356/redirecting-i-o-in-a-custom-shell-program-written-in-c
@@ -9,7 +9,7 @@ https://github.com/hungys/mysh/blob/master/mysh.c
 https://www.gnu.org/software/libc/manual/html_node/Initializing-the-Shell.html
 
 
-##Features:
+Features:
 
 ```echo``` command for printing text to screen.
 
